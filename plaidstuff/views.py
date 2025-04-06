@@ -1,4 +1,5 @@
-from rest_framework.decorators import api_view, authentication_classes, permission_classes
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.response import Response
 import base64
 import os
 import datetime as dt
@@ -6,9 +7,8 @@ import json
 import time
 from datetime import date, timedelta
 import uuid
-
+import logging
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify
 import plaid
 from plaid.model.payment_amount import PaymentAmount
 from plaid.model.payment_amount_currency import PaymentAmountCurrency
@@ -62,19 +62,18 @@ from plaid.model.cra_check_report_partner_insights_get_request import CraCheckRe
 from plaid.model.cra_pdf_add_ons import CraPDFAddOns
 from plaid.api import plaid_api
 from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticated
 from .models import PlaidAccount
 from .serializers import PlaidAccountSerializer
 
-class PlaidAccountViewSet(viewsets.ModelViewSet):
-    queryset = PlaidAccount.objects.all()
-    serializer_class = PlaidAccountSerializer
-
+load_dotenv()
 
 PLAID_CLIENT_ID = os.getenv('PLAID_CLIENT_ID')
 PLAID_SECRET = os.getenv('PLAID_SECRET')
 PLAID_ENV = os.getenv('PLAID_ENV', 'sandbox')
 PLAID_PRODUCTS = os.getenv('PLAID_PRODUCTS', 'transactions').split(',')
 PLAID_COUNTRY_CODES = os.getenv('PLAID_COUNTRY_CODES', 'US').split(',')
+PLAID_CLIENT_NAME = os.getenv('PLAID_CLIENT_NAME', 'No App Name Found')
 
 def empty_to_none(field):
     value = os.getenv(field)
@@ -116,41 +115,60 @@ for product in PLAID_PRODUCTS:
     products.append(Products(product))
 
 
+class PlaidAccountViewSet(viewsets.ModelViewSet):
+    serializer_class = PlaidAccountSerializer
+    permission_classes = [IsAuthenticated]  # Ensure only authenticated users can access
+    queryset = PlaidAccount.objects.none()
+    def get_queryset(self):
+        # Filter objects to only those belonging to the logged-in user
+        return PlaidAccount.objects.filter(user=self.request.user)
+
+
 # generate a plaid link token
 # Create a user token which can be used for Plaid Check, Income, or Multi-Item link flows
 # https://plaid.com/docs/api/users/#usercreate
+
 @api_view(['POST'])
-def create_link_token():
-    global user_token
+@permission_classes([IsAuthenticated])
+def create_link_token(request):
+    logging.info("Creating link token")
+    # get user_token from request
+    user_token = request.data.get('user_token')
+    logging.info(f"user_token: {user_token}")
+    if not user_token:
+    # if user_token is None or len(user_token) == 0:
+        logging.error(f"user: {request.user.id} - user_token is required")
+        return Response({"error": "user_token is required"})
+    
     try:
-        request = LinkTokenCreateRequest(
+        link_request = LinkTokenCreateRequest(
             products=products,
-            client_name="Plaid Quickstart",
+            client_name=PLAID_CLIENT_NAME,
             country_codes=list(map(lambda x: CountryCode(x), PLAID_COUNTRY_CODES)),
             language='en',
             user=LinkTokenCreateRequestUser(
                 client_user_id=str(time.time())
             )
         )
-        if PLAID_REDIRECT_URI!=None:
-            request['redirect_uri']=PLAID_REDIRECT_URI
+        if PLAID_REDIRECT_URI is not None:
+            link_request['redirect_uri']=PLAID_REDIRECT_URI
         if Products('statements') in products:
             statements=LinkTokenCreateRequestStatements(
                 end_date=date.today(),
                 start_date=date.today()-timedelta(days=30)
             )
-            request['statements']=statements
+            link_request['statements']=statements
 
         cra_products = ["cra_base_report", "cra_income_insights", "cra_partner_insights"]
         if any(product in cra_products for product in PLAID_PRODUCTS):
-            request['user_token'] = user_token
-            request['consumer_report_permissible_purpose'] = ConsumerReportPermissiblePurpose('ACCOUNT_REVIEW_CREDIT')
-            request['cra_options'] = LinkTokenCreateRequestCraOptions(
+            link_request['user_token'] = user_token
+            link_request['consumer_report_permissible_purpose'] = ConsumerReportPermissiblePurpose('ACCOUNT_REVIEW_CREDIT')
+            link_request['cra_options'] = LinkTokenCreateRequestCraOptions(
                 days_requested=60
             )
     # create link token
-        response = client.link_token_create(request)
-        return jsonify(response.to_dict())
+        response = client.link_token_create(link_request)
+        return Response(response.to_dict())
     except plaid.ApiException as e:
-        print(e)
-        return json.loads(e.body)
+        logging.error(e)
+        return Response(e.body)
