@@ -1,3 +1,4 @@
+from django.urls import include
 """
 URL configuration for credit_game project.
 
@@ -19,4 +20,5 @@ from django.urls import path
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('api/', include('plaidstuff.urls')),
 ]
