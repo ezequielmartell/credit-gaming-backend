@@ -176,3 +176,6 @@ cython_debug/
 
 # PLAID
 quickstart/
+
+# Personal files
+testing.py

@@ -1,0 +1,7 @@
+plaid-python
+django
+django-rest-framework
+requests
+python-dotenv
+django-cors-headers
+djangorestframework-simplejwt
