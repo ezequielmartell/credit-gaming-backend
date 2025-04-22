@@ -157,7 +157,8 @@ SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=30),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
     'ROTATE_REFRESH_TOKENS': True,
-    'BLACKLIST_AFTER_ROTATION': True,
+    # TODO: Tokens are being expired on the frontend and not updated for use in the state correctly. Calls were not being made with the new token, so they were failing.
+    # 'BLACKLIST_AFTER_ROTATION': True,
 }
 
 # Logging settings
@@ -182,3 +183,41 @@ else:
 
 # CSRF settings
 CSRF_TRUSTED_ORIGINS = os.getenv('CSRF_TRUSTED_ORIGINS', '').split(',')
+
+# # Celery Configuration
+# USE_LOCAL_SQS = os.getenv('USE_LOCAL_SQS', 'False')
+# CELERY_BROKER_URL = os.getenv('CELERY_BROKER_URL', 'sqs://localhost:9324')
+# AWS_REGION = os.getenv('AWS_REGION', 'us-east-1')
+
+# if USE_LOCAL_SQS == 'True':
+#     AWS_ACCESS_KEY_ID = 'dummy'
+#     AWS_SECRET_ACCESS_KEY = 'dummy'
+# else:
+#     AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID')
+#     AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY')
+
+# CELERY_RESULT_BACKEND = None  # We don't need results for these tasks
+# CELERY_ACCEPT_CONTENT = ['json']
+# CELERY_TASK_SERIALIZER = 'json'
+# CELERY_RESULT_SERIALIZER = 'json'
+# CELERY_TIMEZONE = 'UTC'
+
+# Celery Beat Configuration
+# CELERY_BEAT_SCHEDULER = 'django_celery_beat.schedulers:DatabaseScheduler'
+
+
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", default="sqs://test:test@localhost:9324")
+# CELERY_TASK_DEFAULT_QUEUE = os.getenv("CELERY_TASK_DEFAULT_QUEUE", default="default")
+# CELERY_IMPORTS = (
+# 'django_aws.tasks',
+# )
+CELERY_BROKER_TRANSPORT_OPTIONS = {
+    "region": os.getenv("AWS_REGION", default="us-east-1")
+}
+
+# CELERY_BEAT_SCHEDULE = {
+#     "beat_task": {
+#         "task": "django_aws.tasks.sync_boycott_tasks",
+#         "schedule": 60.0,
+#     },
+# }

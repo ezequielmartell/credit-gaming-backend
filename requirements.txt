@@ -5,3 +5,6 @@ requests
 python-dotenv
 django-cors-headers
 djangorestframework-simplejwt
+celery
+boto3
+django-celery-beat

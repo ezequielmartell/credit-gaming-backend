@@ -1,10 +1,9 @@
 from rest_framework import serializers
 from .models import PlaidAccount
+import logging
 
 class PlaidAccountSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlaidAccount
-        fields = '__all__'
-
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        fields = ['id', 'institution', 'created_at', 'updated_at', 'connection_type', 'connection_data']
+        # Excluding sensitive fields like access_token and item_id
